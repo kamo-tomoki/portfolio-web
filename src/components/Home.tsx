@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { ShodoCanvas } from "./ShodoCanvas";
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -6,6 +7,9 @@ const styles: Record<string, CSSProperties> = {
     background: "#ffffff",
     display: "flex",
     alignItems: "center",
+  },
+  left: {
+    flex: 1,
     padding: "0 62px",
   },
   content: {
@@ -34,17 +38,27 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: "none",
     lineHeight: "normal",
   },
+  right: {
+    flex: 1,
+    height: "100vh",
+    position: "relative",
+  },
 };
 
 export function Home() {
   return (
     <div style={styles.container}>
-      <div style={styles.content}>
-        <h1 style={styles.name}>Kamo Tomoki</h1>
-        <nav style={styles.nav}>
-          <a href="#contact" style={styles.navLink}>contact</a>
-          <a href="#works" style={styles.navLink}>works</a>
-        </nav>
+      <div style={styles.left}>
+        <div style={styles.content}>
+          <h1 style={styles.name}>Kamo Tomoki</h1>
+          <nav style={styles.nav}>
+            <a href="#contact" style={styles.navLink}>contact</a>
+            <a href="#works" style={styles.navLink}>works</a>
+          </nav>
+        </div>
+      </div>
+      <div style={styles.right}>
+        <ShodoCanvas />
       </div>
     </div>
   );
