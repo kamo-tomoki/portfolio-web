@@ -98,6 +98,18 @@ void main() {
   o = vec4(vec3(1.0 - ink), 1);
 }`;
 
+// Transparent display: ink as black with alpha, for overlay compositing
+const DISPLAY_ALPHA_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_ink;
+void main() {
+  float raw = texture(u_ink, vUv).x;
+  float ink = smoothstep(0.008, 0.12, raw) * 0.88;
+  o = vec4(0.0, 0.0, 0.0, ink);
+}`;
+
 const SCALE_FRAG = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -131,8 +143,8 @@ export class FluidSimulation {
   private div: FBO;
   private ink: DblFBO;
 
-  constructor(canvas: HTMLCanvasElement, simRes = 128) {
-    const gl = canvas.getContext("webgl2", { alpha: false })!;
+  constructor(canvas: HTMLCanvasElement, simRes = 128, alpha = false) {
+    const gl = canvas.getContext("webgl2", { alpha, premultipliedAlpha: true })!;
     if (!gl) throw new Error("WebGL2 required");
     this.gl = gl;
 
@@ -155,7 +167,7 @@ export class FluidSimulation {
       pressure: PRESSURE_FRAG,
       grad: GRAD_FRAG,
       splat: SPLAT_FRAG,
-      display: DISPLAY_FRAG,
+      display: alpha ? DISPLAY_ALPHA_FRAG : DISPLAY_FRAG,
       scale: SCALE_FRAG,
     };
     for (const [name, fs] of Object.entries(shaders)) {
@@ -412,6 +424,11 @@ export class FluidSimulation {
     this.tex(p, "u_target", this.vel.read.tex, 0);
     this.run(p, this.vel.write, this.sw, this.sh);
     this.swap(this.vel);
+  }
+
+  resize(width: number, height: number) {
+    this.dw = width;
+    this.dh = height;
   }
 
   dispose() {

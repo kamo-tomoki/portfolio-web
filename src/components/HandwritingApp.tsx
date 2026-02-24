@@ -1,5 +1,6 @@
 import { useHandwritingEffect } from "../hooks/useHandwritingEffect";
 import { Home } from "./Home";
+import { InkCursor } from "./InkCursor";
 
 const appStyles = {
   app: {
@@ -63,6 +64,7 @@ export default function HandwritingApp() {
           display: isComplete ? "none" : "block",
         }}
       />
+      <InkCursor />
     </div>
   );
 }
