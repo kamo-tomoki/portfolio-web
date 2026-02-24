@@ -151,8 +151,8 @@ export function ShodoCanvas() {
             const rawSpeed = Math.sqrt(rawDx * rawDx + rawDy * rawDy);
             // Slower = more ink, like a real brush pressing down
             const inkAmt = Math.max(0.3, 0.8 - rawSpeed * 8);
-            // Brush radius: thicker strokes (~3-4% of screen)
-            const radius = 0.0004 + 0.0002 * (1 - Math.min(rawSpeed * 10, 0.8));
+            // Brush radius (~2-3% of screen)
+            const radius = 0.000288 + 0.000144 * (1 - Math.min(rawSpeed * 10, 0.8));
             sim.splat(pt[0], pt[1], dx, dy, inkAmt, radius);
           }
           prevPoint = pt;
