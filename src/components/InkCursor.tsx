@@ -26,9 +26,7 @@ export function InkCursor() {
     let running = true;
     let lastTime = performance.now();
 
-    // Raw mouse position (updated on mousemove)
     const mouse = { x: -1, y: -1 };
-    // Smoothed position (lerped each frame)
     const smooth = { x: -1, y: -1 };
     const prevSmooth = { x: -1, y: -1 };
     let hasMoved = false;
@@ -38,7 +36,6 @@ export function InkCursor() {
       mouse.y = 1 - e.clientY / window.innerHeight;
 
       if (!hasMoved) {
-        // Initialize smooth position on first move (no lerp jump)
         smooth.x = mouse.x;
         smooth.y = mouse.y;
         prevSmooth.x = mouse.x;
@@ -62,30 +59,24 @@ export function InkCursor() {
       lastTime = now;
 
       if (hasMoved && mouse.x >= 0) {
-        // Save previous smooth position
         prevSmooth.x = smooth.x;
         prevSmooth.y = smooth.y;
 
-        // Lerp towards actual mouse position for smooth trail
         smooth.x += (mouse.x - smooth.x) * LERP_SPEED;
         smooth.y += (mouse.y - smooth.y) * LERP_SPEED;
 
-        // Compute velocity from smoothed movement
         const dx = (smooth.x - prevSmooth.x) * 25;
         const dy = (smooth.y - prevSmooth.y) * 25;
         const speed = Math.sqrt(dx * dx + dy * dy);
 
         if (speed > 0.0005) {
-          // Slower movement = more ink (like pressing a brush down)
           const inkAmt = Math.max(0.1, 0.45 - speed * 3);
-          // Brush radius: larger when slow
           const radius =
             0.000336 + 0.000168 * (1 - Math.min(speed * 5, 0.8));
           sim.splat(smooth.x, smooth.y, dx, dy, inkAmt, radius);
         }
       }
 
-      // Continuously fade ink for the disappearing trail effect
       sim.fadeInk(INK_FADE);
       sim.step(dt);
       sim.render();
@@ -122,6 +113,7 @@ export function InkCursor() {
         height: "100%",
         pointerEvents: "none",
         zIndex: 9999,
+        mixBlendMode: "difference",
       }}
     />
   );

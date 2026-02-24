@@ -98,7 +98,9 @@ void main() {
   o = vec4(vec3(1.0 - ink), 1);
 }`;
 
-// Transparent display: ink as black with alpha, for overlay compositing
+// White ink with alpha, used with CSS mix-blend-mode: difference
+// difference(white, white_bg) = black → visible ink on background
+// difference(white, black_text) = white → text turns white under ink
 const DISPLAY_ALPHA_FRAG = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -106,8 +108,8 @@ out vec4 o;
 uniform sampler2D u_ink;
 void main() {
   float raw = texture(u_ink, vUv).x;
-  float ink = smoothstep(0.008, 0.12, raw) * 0.88;
-  o = vec4(0.0, 0.0, 0.0, ink);
+  float ink = smoothstep(0.008, 0.12, raw) * 0.95;
+  o = vec4(ink, ink, ink, ink);
 }`;
 
 const SCALE_FRAG = `#version 300 es
