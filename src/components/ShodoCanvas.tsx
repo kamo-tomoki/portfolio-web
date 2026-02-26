@@ -3,6 +3,8 @@ import { FluidSimulation } from "../utils/FluidSimulation";
 
 export interface ShodoCanvasHandle {
   triggerTransitionFade: () => void;
+  getCanvas: () => HTMLCanvasElement | null;
+  exportInk: () => HTMLCanvasElement | null;
 }
 
 // Import stroke data for each character
@@ -80,11 +82,18 @@ function strokeLength(median: number[][]): number {
 
 export const ShodoCanvas = forwardRef<ShodoCanvasHandle>(function ShodoCanvas(_, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const simRef = useRef<FluidSimulation | null>(null);
   const phaseRef = useRef<"draw" | "hold" | "fade" | "pause" | "transitionFade">("draw");
 
   useImperativeHandle(ref, () => ({
     triggerTransitionFade() {
       phaseRef.current = "transitionFade";
+    },
+    getCanvas() {
+      return canvasRef.current;
+    },
+    exportInk() {
+      return simRef.current?.exportInkCanvas() ?? null;
     },
   }));
 
@@ -103,6 +112,7 @@ export const ShodoCanvas = forwardRef<ShodoCanvasHandle>(function ShodoCanvas(_,
     } catch {
       return; // WebGL2 not available
     }
+    simRef.current = sim;
 
     let running = true;
     let charIdx = 0;
@@ -258,6 +268,7 @@ export const ShodoCanvas = forwardRef<ShodoCanvasHandle>(function ShodoCanvas(_,
       running = false;
       window.removeEventListener("resize", onResize);
       sim.dispose();
+      simRef.current = null;
     };
   }, []);
 

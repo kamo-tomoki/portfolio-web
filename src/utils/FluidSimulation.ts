@@ -489,6 +489,44 @@ export class FluidSimulation {
     this.dh = height;
   }
 
+  /** Export current ink as a dark-on-transparent 2D canvas.
+   *  Reads directly from the simulation FBO (always valid, no preserveDrawingBuffer needed). */
+  exportInkCanvas(): HTMLCanvasElement | null {
+    const gl = this.gl;
+    const { sw, sh } = this;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.ink.read.fb);
+    const pixels = new Float32Array(sw * sh * 4);
+    gl.readPixels(0, 0, sw, sh, gl.RGBA, gl.FLOAT, pixels);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    const out = document.createElement("canvas");
+    out.width = sw;
+    out.height = sh;
+    const ctx = out.getContext("2d")!;
+    const imageData = ctx.createImageData(sw, sh);
+    const d = imageData.data;
+
+    for (let y = 0; y < sh; y++) {
+      for (let x = 0; x < sw; x++) {
+        // Flip Y: WebGL bottom-up → Canvas top-down
+        const si = ((sh - 1 - y) * sw + x) * 4;
+        const di = (y * sw + x) * 4;
+        const raw = pixels[si]; // ink density in R channel
+        // Match DISPLAY_FRAG: smoothstep(0.08, 0.18, raw) * 0.93
+        const t = Math.max(0, Math.min(1, (raw - 0.08) / 0.10));
+        const ink = t * t * (3 - 2 * t) * 0.93;
+        d[di] = 0;
+        d[di + 1] = 0;
+        d[di + 2] = 0;
+        d[di + 3] = Math.round(ink * 255);
+      }
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    return out;
+  }
+
   dispose() {
     const gl = this.gl;
     Object.values(this.progs).forEach((p) => gl.deleteProgram(p));

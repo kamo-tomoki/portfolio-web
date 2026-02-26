@@ -6,7 +6,8 @@ import { Works } from "./Works";
 import { InkCursor } from "./InkCursor";
 import { InkTransitionOverlay, type InkTransitionHandle } from "./InkTransitionOverlay";
 import type { ShodoCanvasHandle } from "./ShodoCanvas";
-import { gatherTextElements, renderTextToCanvas } from "../utils/renderTextToCanvas";
+import { gatherTextElements, renderTextToCanvas, type CanvasSource } from "../utils/renderTextToCanvas";
+
 
 const appStyles = {
   app: {
@@ -66,10 +67,23 @@ export default function HandwritingApp() {
       if (currentPage === "home") {
         // Capture text positions before hiding
         const textElements = gatherTextElements();
+        // Export ShodoCanvas ink as dark-on-transparent (reads FBO directly)
+        const canvasSources: CanvasSource[] = [];
+        const shodoElement = shodoRef.current?.getCanvas();
+        const shodoInk = shodoRef.current?.exportInk();
+        if (shodoElement && shodoInk) {
+          canvasSources.push({
+            canvas: shodoInk,
+            rect: shodoElement.getBoundingClientRect(),
+          });
+        }
+
         const textCanvas = renderTextToCanvas(
           textElements,
           window.innerWidth,
-          window.innerHeight
+          window.innerHeight,
+          undefined,
+          canvasSources
         );
 
         // Load text as ink and start fluid dissolution
