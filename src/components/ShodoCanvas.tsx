@@ -1,5 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { FluidSimulation } from "../utils/FluidSimulation";
+
+export interface ShodoCanvasHandle {
+  triggerTransitionFade: () => void;
+}
 
 // Import stroke data for each character
 import kuuData from "hanzi-writer-data/空.json";
@@ -74,8 +78,15 @@ function strokeLength(median: number[][]): number {
   return len;
 }
 
-export function ShodoCanvas() {
+export const ShodoCanvas = forwardRef<ShodoCanvasHandle>(function ShodoCanvas(_, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const phaseRef = useRef<"draw" | "hold" | "fade" | "pause" | "transitionFade">("draw");
+
+  useImperativeHandle(ref, () => ({
+    triggerTransitionFade() {
+      phaseRef.current = "transitionFade";
+    },
+  }));
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -95,8 +106,9 @@ export function ShodoCanvas() {
 
     let running = true;
     let charIdx = 0;
-    let phase: "draw" | "hold" | "fade" | "pause" = "draw";
+    let phase: "draw" | "hold" | "fade" | "pause" | "transitionFade" = "draw";
     let phaseStart = performance.now();
+    let transitionFadeStart = 0;
     let strokeIdx = 0;
     let strokeProgress = 0; // 0-1 within current stroke
     let prevPoint: [number, number] | null = null;
@@ -130,6 +142,11 @@ export function ShodoCanvas() {
       if (!running) return;
       const dt = Math.min((now - lastTime) / 1000, 0.033);
       lastTime = now;
+
+      // Check for external transition fade trigger
+      if (phaseRef.current === "transitionFade" && phase !== "transitionFade") {
+        phase = "transitionFade";
+      }
 
       switch (phase) {
         case "draw": {
@@ -202,6 +219,24 @@ export function ShodoCanvas() {
           }
           break;
         }
+
+        case "transitionFade": {
+          if (transitionFadeStart === 0) {
+            transitionFadeStart = now;
+          }
+          const elapsed = now - transitionFadeStart;
+          const progress = Math.min(elapsed / 600, 1);
+
+          // Pure fade — no velocity splats, no waves
+          // ShodoCanvas is hidden by CSS opacity during transition,
+          // the visible dissolution is handled by InkTransitionOverlay
+          sim.fadeInk(0.96);
+
+          if (progress >= 1) {
+            sim.clear();
+          }
+          break;
+        }
       }
 
       sim.step(dt);
@@ -232,4 +267,4 @@ export function ShodoCanvas() {
       style={{ width: "100%", height: "100%", display: "block" }}
     />
   );
-}
+});

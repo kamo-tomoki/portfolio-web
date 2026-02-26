@@ -112,6 +112,36 @@ void main() {
   o = vec4(ink, ink, ink, ink);
 }`;
 
+// Dark ink with alpha transparency – for transition overlay
+// Black ink appears on transparent canvas, spreading via fluid dynamics
+const DISPLAY_DARK_ALPHA_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_ink;
+void main() {
+  float raw = texture(u_ink, vUv).x;
+  float ink = smoothstep(0.01, 0.10, raw) * 0.92;
+  o = vec4(0.0, 0.0, 0.0, ink);
+}`;
+
+// Load ink from a 2D canvas – converts dark pixels to ink density
+const LOAD_INK_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 o;
+uniform sampler2D u_source;
+uniform sampler2D u_existing;
+uniform float u_strength;
+void main() {
+  vec2 flippedUv = vec2(vUv.x, 1.0 - vUv.y);
+  vec4 src = texture(u_source, flippedUv);
+  float lum = dot(src.rgb, vec3(0.299, 0.587, 0.114));
+  float darkness = (1.0 - lum) * src.a;
+  float existing = texture(u_existing, vUv).x;
+  o = vec4(existing + darkness * u_strength, 0.0, 0.0, 1.0);
+}`;
+
 const SCALE_FRAG = `#version 300 es
 precision highp float;
 in vec2 vUv;
@@ -145,8 +175,9 @@ export class FluidSimulation {
   private div: FBO;
   private ink: DblFBO;
 
-  constructor(canvas: HTMLCanvasElement, simRes = 128, alpha = false) {
-    const gl = canvas.getContext("webgl2", { alpha, premultipliedAlpha: true })!;
+  constructor(canvas: HTMLCanvasElement, simRes = 128, alpha: boolean | "dark" = false) {
+    const useAlpha = !!alpha;
+    const gl = canvas.getContext("webgl2", { alpha: useAlpha, premultipliedAlpha: true })!;
     if (!gl) throw new Error("WebGL2 required");
     this.gl = gl;
 
@@ -169,8 +200,9 @@ export class FluidSimulation {
       pressure: PRESSURE_FRAG,
       grad: GRAD_FRAG,
       splat: SPLAT_FRAG,
-      display: alpha ? DISPLAY_ALPHA_FRAG : DISPLAY_FRAG,
+      display: alpha === "dark" ? DISPLAY_DARK_ALPHA_FRAG : alpha ? DISPLAY_ALPHA_FRAG : DISPLAY_FRAG,
       scale: SCALE_FRAG,
+      loadInk: LOAD_INK_FRAG,
     };
     for (const [name, fs] of Object.entries(shaders)) {
       this.progs[name] = this.compile(VERT, fs);
@@ -426,6 +458,30 @@ export class FluidSimulation {
     this.tex(p, "u_target", this.vel.read.tex, 0);
     this.run(p, this.vel.write, this.sw, this.sh);
     this.swap(this.vel);
+  }
+
+  loadInkFromCanvas(sourceCanvas: HTMLCanvasElement, strength = 1.0) {
+    const gl = this.gl;
+
+    const srcTex = gl.createTexture()!;
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+
+    const p = this.progs.loadInk;
+    gl.useProgram(p);
+    this.tex(p, "u_source", srcTex, 2);
+    this.tex(p, "u_existing", this.ink.read.tex, 0);
+    this.uni(p, "u_strength", strength);
+    this.bind(this.ink.write, this.sw, this.sh);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.swap(this.ink);
+
+    gl.deleteTexture(srcTex);
   }
 
   resize(width: number, height: number) {

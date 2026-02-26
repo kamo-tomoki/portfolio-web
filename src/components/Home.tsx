@@ -1,5 +1,12 @@
-import type { CSSProperties } from "react";
-import { ShodoCanvas } from "./ShodoCanvas";
+import type { CSSProperties, RefObject } from "react";
+import { ShodoCanvas, type ShodoCanvasHandle } from "./ShodoCanvas";
+
+import type { PageName } from "../hooks/usePageTransition";
+
+interface HomeProps {
+  onNavigate?: (page: PageName) => void;
+  shodoRef?: RefObject<ShodoCanvasHandle | null>;
+}
 
 const styles: Record<string, CSSProperties> = {
   container: {
@@ -45,20 +52,30 @@ const styles: Record<string, CSSProperties> = {
   },
 };
 
-export function Home() {
+export function Home({ onNavigate, shodoRef }: HomeProps) {
   return (
     <div style={styles.container}>
       <div style={styles.left}>
         <div style={styles.content}>
-          <h1 style={styles.name}>Kamo Tomoki</h1>
+          <h1 style={styles.name} data-dissolve="text">Kamo Tomoki</h1>
           <nav style={styles.nav}>
-            <a href="#contact" style={styles.navLink}>contact</a>
-            <a href="#works" style={styles.navLink}>works</a>
+            <a href="#contact" style={styles.navLink} data-dissolve="text">contact</a>
+            <a
+              href="/works"
+              style={styles.navLink}
+              data-dissolve="text"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate?.("works");
+              }}
+            >
+              works
+            </a>
           </nav>
         </div>
       </div>
       <div style={styles.right}>
-        <ShodoCanvas />
+        <ShodoCanvas ref={shodoRef} />
       </div>
     </div>
   );
