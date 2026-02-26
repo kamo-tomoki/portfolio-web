@@ -77,17 +77,16 @@ export const InkTransitionOverlay = forwardRef<InkTransitionHandle>(
             }
 
             // Fade: gentle at first, very aggressive at end
-            if (t < 0.2) {
+            if (t < 0.15) {
               sim.fadeInk(0.999);
-            } else if (t < 0.4) {
-              sim.fadeInk(0.994);
-            } else if (t < 0.55) {
-              sim.fadeInk(0.98);
-            } else if (t < 0.7) {
-              sim.fadeInk(0.93);
+            } else if (t < 0.35) {
+              sim.fadeInk(0.993);
+            } else if (t < 0.5) {
+              sim.fadeInk(0.975);
+            } else if (t < 0.6) {
+              sim.fadeInk(0.92);
             } else {
-              // ~27 frames at 0.75 → 0.75^27 ≈ 0.0003 → invisible
-              sim.fadeInk(0.75);
+              sim.fadeInk(0.72);
             }
 
             sim.render();
