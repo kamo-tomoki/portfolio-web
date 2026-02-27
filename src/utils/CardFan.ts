@@ -19,9 +19,9 @@ const CARD_WIDTH = 280;
 const CARD_HEIGHT = 380;
 const FAN_RADIUS = 800;
 const FAN_ARC_DEGREES = 40;
-const CARD_TILT_X_DEG = -5;
+const CARD_TILT_X_DEG = -30;
 const CAMERA_Z = 920;
-const CAMERA_Y = -100;
+const CAMERA_Y = 100;
 
 const SELECTED_LIFT_Y = 80;
 const SELECTED_LIFT_Z = 300;
