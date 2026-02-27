@@ -1,20 +1,15 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
+import { CardFan, type CardData } from "../utils/CardFan";
 
 interface WorksProps {
   onNavigateHome: () => void;
 }
 
-interface WorkItem {
-  title: string;
-  description: string;
-  tech: string[];
-  year: string;
-}
-
-const WORKS: WorkItem[] = [
+const WORKS: CardData[] = [
   {
     title: "Fluid Calligraphy",
-    description: "WebGL2による流体シミュレーションを用いたインタラクティブ書道表現",
+    description:
+      "WebGL2による流体シミュレーションを用いたインタラクティブ書道表現",
     tech: ["WebGL2", "TypeScript", "React"],
     year: "2025",
   },
@@ -26,30 +21,35 @@ const WORKS: WorkItem[] = [
   },
   {
     title: "Generative Typography",
-    description: "フォントデータを解析しストロークアニメーションを生成する実験的タイポグラフィ",
+    description:
+      "フォントデータを解析しストロークアニメーションを生成する実験的タイポグラフィ",
     tech: ["opentype.js", "Canvas API", "TypeScript"],
     year: "2024",
   },
 ];
 
+const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
 const styles: Record<string, CSSProperties> = {
   container: {
     minHeight: "100vh",
     background: "#ffffff",
-    padding: "80px 62px",
+    padding: isMobile ? "40px 20px 0" : "80px 62px 0",
     fontFamily: "'Inter', sans-serif",
     color: "#000000",
+    display: "flex",
+    flexDirection: "column",
   },
   header: {
     display: "flex",
     alignItems: "center",
-    gap: "32px",
-    marginBottom: "64px",
+    gap: isMobile ? "16px" : "32px",
+    marginBottom: isMobile ? "16px" : "32px",
   },
   backLink: {
     background: "none",
     border: "none",
-    fontSize: "18px",
+    fontSize: isMobile ? "15px" : "18px",
     fontFamily: "'Inter', sans-serif",
     fontWeight: 500,
     color: "#000000",
@@ -58,57 +58,43 @@ const styles: Record<string, CSSProperties> = {
     textDecoration: "none",
   },
   title: {
-    fontSize: "64px",
+    fontSize: isMobile ? "36px" : "64px",
     fontWeight: 700,
     margin: 0,
     lineHeight: "normal",
   },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-    gap: "40px",
-  },
-  card: {
-    border: "1px solid #e0e0e0",
-    padding: "32px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  year: {
-    fontSize: "14px",
-    fontWeight: 400,
-    color: "#888888",
-  },
-  cardTitle: {
-    fontSize: "24px",
-    fontWeight: 700,
-    margin: 0,
-    lineHeight: "normal",
-  },
-  cardDesc: {
-    fontSize: "15px",
-    fontWeight: 400,
-    color: "#444444",
-    margin: 0,
-    lineHeight: 1.6,
-  },
-  techRow: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
-  techTag: {
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "#666666",
-    border: "1px solid #cccccc",
-    padding: "4px 10px",
-    borderRadius: "2px",
+  fanContainer: {
+    flex: 1,
+    position: "relative",
+    minHeight: isMobile ? "350px" : "500px",
   },
 };
 
 export function Works({ onNavigateHome }: WorksProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fanRef = useRef<CardFan | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const fan = new CardFan(container, WORKS);
+    fanRef.current = fan;
+
+    fan.onCardClick = (_index, data) => {
+      console.log("Card clicked:", data.title);
+    };
+
+    const handleResize = () => fan.resize();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      fan.dispose();
+      fanRef.current = null;
+    };
+  }, []);
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -124,22 +110,7 @@ export function Works({ onNavigateHome }: WorksProps) {
         </a>
         <h1 style={styles.title}>Works</h1>
       </header>
-      <div style={styles.grid}>
-        {WORKS.map((work, i) => (
-          <article key={i} style={styles.card}>
-            <span style={styles.year}>{work.year}</span>
-            <h2 style={styles.cardTitle}>{work.title}</h2>
-            <p style={styles.cardDesc}>{work.description}</p>
-            <div style={styles.techRow}>
-              {work.tech.map((t) => (
-                <span key={t} style={styles.techTag}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
+      <div ref={containerRef} style={styles.fanContainer} />
     </div>
   );
 }
