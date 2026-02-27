@@ -41,6 +41,18 @@ const MAX_SCALE = 1.0;
 // Selected card scale: on PC shows slightly larger, on SP restores to ~original
 const SELECTED_SCALE_PC = 1.2;
 
+// ── Ink reveal constants ────────────────────────────────
+
+const INK_SIM_SCALE = 4; // simulation at 1/4 card resolution
+const INK_SIM_W = Math.ceil(CARD_WIDTH / INK_SIM_SCALE);
+const INK_SIM_H = Math.ceil(CARD_HEIGHT / INK_SIM_SCALE);
+const INK_DIFFUSION_RATE = 0.25;
+const INK_FADE_RATE = 0.985;
+const INK_NUM_SEEDS = 5;
+const INK_SEED_RADIUS_MIN = 2;
+const INK_SEED_RADIUS_MAX = 5;
+const INK_STAGGER_MS = 250; // delay between cards
+
 // ── Internal card state ─────────────────────────────────
 
 interface Vec3 {
@@ -132,7 +144,7 @@ export class CardFan {
         index: i,
         targetPosition: { x: 0, y: 0, z: 0 },
         targetRotation: { x: 0, y: 0, z: 0 },
-        currentPosition: { x: 0, y: -800, z: -200 },
+        currentPosition: { x: 0, y: 0, z: 0 },
         currentRotation: { x: 0, y: 0, z: 0 },
         targetScale: scale,
         currentScale: scale,
@@ -141,22 +153,16 @@ export class CardFan {
       });
     }
 
-    // Compute layout targets
+    // Compute layout and place cards at their final positions immediately
     this.computeFanLayout();
+    for (const card of this.cards) {
+      card.currentPosition = { ...card.targetPosition };
+      card.currentRotation = { ...card.targetRotation };
+    }
 
-    // Set initial positions for entry animation (below viewport)
+    // Start ink reveal animation (cards start covered in ink)
     for (let i = 0; i < this.cards.length; i++) {
-      const card = this.cards[i];
-      card.currentPosition = {
-        x: card.targetPosition.x,
-        y: card.targetPosition.y - 600 - i * 80,
-        z: card.targetPosition.z - 300,
-      };
-      card.currentRotation = {
-        x: card.targetRotation.x,
-        y: card.targetRotation.y,
-        z: 0,
-      };
+      this.startInkReveal(this.cards[i], i * INK_STAGGER_MS);
     }
 
     // Start animation loop
@@ -263,6 +269,7 @@ export class CardFan {
       overflow: "hidden",
       borderRadius: "12px",
       backfaceVisibility: "hidden",
+      position: "relative",
     });
 
     // Year
@@ -352,6 +359,115 @@ export class CardFan {
     });
 
     return card;
+  }
+
+  // ── Private: Ink reveal effect ────────────────────────
+
+  private startInkReveal(card: CardState, delay: number): void {
+    // Create overlay canvas at reduced resolution
+    const canvas = document.createElement("canvas");
+    canvas.width = INK_SIM_W;
+    canvas.height = INK_SIM_H;
+    Object.assign(canvas.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: "100%",
+      height: "100%",
+      pointerEvents: "none",
+      borderRadius: "12px",
+      zIndex: "10",
+    });
+    card.element.appendChild(canvas);
+
+    const ctx = canvas.getContext("2d")!;
+
+    // Fill with black initially
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, INK_SIM_W, INK_SIM_H);
+
+    // Ink density grid: 1.0 = full ink, 0.0 = clear
+    let ink = new Float32Array(INK_SIM_W * INK_SIM_H).fill(1.0);
+    let temp = new Float32Array(INK_SIM_W * INK_SIM_H);
+
+    const seedAndRun = () => {
+      // Punch seed holes at random positions
+      for (let s = 0; s < INK_NUM_SEEDS; s++) {
+        const sx = Math.floor(Math.random() * INK_SIM_W);
+        const sy = Math.floor(Math.random() * INK_SIM_H);
+        const r =
+          INK_SEED_RADIUS_MIN +
+          Math.floor(Math.random() * (INK_SEED_RADIUS_MAX - INK_SEED_RADIUS_MIN + 1));
+        for (let dy = -r; dy <= r; dy++) {
+          for (let dx = -r; dx <= r; dx++) {
+            if (dx * dx + dy * dy > r * r) continue;
+            const px = sx + dx;
+            const py = sy + dy;
+            if (px >= 0 && px < INK_SIM_W && py >= 0 && py < INK_SIM_H) {
+              ink[py * INK_SIM_W + px] = 0;
+            }
+          }
+        }
+      }
+
+      const imageData = ctx.createImageData(INK_SIM_W, INK_SIM_H);
+
+      const step = () => {
+        if (!this.running) {
+          canvas.remove();
+          return;
+        }
+
+        // Diffusion + fade step
+        for (let y = 0; y < INK_SIM_H; y++) {
+          for (let x = 0; x < INK_SIM_W; x++) {
+            const i = y * INK_SIM_W + x;
+            const c = ink[i];
+            const l = x > 0 ? ink[i - 1] : c;
+            const r = x < INK_SIM_W - 1 ? ink[i + 1] : c;
+            const t = y > 0 ? ink[i - INK_SIM_W] : c;
+            const b = y < INK_SIM_H - 1 ? ink[i + INK_SIM_W] : c;
+            const avg = (l + r + t + b) * 0.25;
+            temp[i] =
+              (c * (1 - INK_DIFFUSION_RATE) + avg * INK_DIFFUSION_RATE) *
+              INK_FADE_RATE;
+          }
+        }
+        [ink, temp] = [temp, ink];
+
+        // Render to canvas
+        const data = imageData.data;
+        let maxInk = 0;
+        for (let i = 0; i < ink.length; i++) {
+          const v = ink[i];
+          if (v > maxInk) maxInk = v;
+          // Black ink with varying alpha
+          const alpha = Math.round(Math.min(1, v) * 255);
+          const idx = i * 4;
+          data[idx] = 0;
+          data[idx + 1] = 0;
+          data[idx + 2] = 0;
+          data[idx + 3] = alpha;
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        // Done when ink is fully dissolved
+        if (maxInk < 0.01) {
+          canvas.remove();
+          return;
+        }
+
+        requestAnimationFrame(step);
+      };
+
+      requestAnimationFrame(step);
+    };
+
+    if (delay > 0) {
+      setTimeout(seedAndRun, delay);
+    } else {
+      seedAndRun();
+    }
   }
 
   // ── Private: Fan layout computation ─────────────────
