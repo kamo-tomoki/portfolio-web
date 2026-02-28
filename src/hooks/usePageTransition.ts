@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 
-export type PageName = "home" | "works";
+export type PageName = "home" | "works" | "portfolio";
 export type TransitionPhase = "idle" | "fadeOut" | "switching" | "fadeIn";
 
 // fadeOut: ink wash covers the screen (700ms ink spread + 100ms buffer)
@@ -20,11 +20,14 @@ function easeOutCubic(t: number): number {
 
 function pathToPage(pathname: string): PageName {
   if (pathname === "/works" || pathname === "/works/") return "works";
+  if (pathname === "/portfolio" || pathname === "/portfolio/") return "portfolio";
   return "home";
 }
 
 function pageToPath(page: PageName): string {
-  return page === "works" ? "/works" : "/";
+  if (page === "works") return "/works";
+  if (page === "portfolio") return "/portfolio";
+  return "/";
 }
 
 export function usePageTransition() {

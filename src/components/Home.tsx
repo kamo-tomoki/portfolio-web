@@ -61,6 +61,17 @@ export function Home({ onNavigate, shodoRef }: HomeProps) {
           <nav style={styles.nav}>
             <a href="#contact" style={styles.navLink} data-dissolve="text">contact</a>
             <a
+              href="/portfolio"
+              style={styles.navLink}
+              data-dissolve="text"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigate?.("portfolio");
+              }}
+            >
+              portfolio
+            </a>
+            <a
               href="/works"
               style={styles.navLink}
               data-dissolve="text"

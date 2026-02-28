@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from "react";
 import { useHandwritingEffect } from "../hooks/useHandwritingEffect";
 import { usePageTransition } from "../hooks/usePageTransition";
 import { Home } from "./Home";
+import { Portfolio } from "./Portfolio";
 import { Works } from "./Works";
 import { InkCursor } from "./InkCursor";
 import { InkTransitionOverlay, type InkTransitionHandle } from "./InkTransitionOverlay";
@@ -113,6 +114,8 @@ export default function HandwritingApp() {
         >
           {currentPage === "home" ? (
             <Home onNavigate={startTransition} shodoRef={shodoRef} />
+          ) : currentPage === "portfolio" ? (
+            <Portfolio onNavigateHome={() => startTransition("home")} />
           ) : (
             <Works onNavigateHome={() => startTransition("home")} />
           )}
