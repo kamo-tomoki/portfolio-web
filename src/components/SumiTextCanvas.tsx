@@ -66,11 +66,11 @@ const WIDTHS: Record<string, number> = {
 const LINES = ["Software", "Engineer"];
 
 // Timing
-const STROKE_SPEED = 0.6;   // ms per local-unit of stroke length (slower = denser splats)
-const STROKE_GAP = 70;      // ms between strokes in a char
-const CHAR_GAP = 100;       // ms between characters
-const LINE_GAP = 180;       // ms between lines
-const INITIAL_DELAY = 350;
+const STROKE_SPEED = 0.43;  // ms per local-unit of stroke length (1.4× speed)
+const STROKE_GAP = 50;      // ms between strokes in a char
+const CHAR_GAP = 71;        // ms between characters
+const LINE_GAP = 129;       // ms between lines
+const INITIAL_DELAY = 250;
 
 // ---------------------------------------------------------------------------
 // Helpers
