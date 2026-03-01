@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { FluidSimulation } from "../utils/FluidSimulation";
 
 // ---------------------------------------------------------------------------
@@ -57,19 +57,13 @@ const STROKES: Record<string, number[][][]> = {
   ],
 };
 
-// Relative width of each letter (1.0 = standard square cell).
-const WIDTHS: Record<string, number> = {
-  S: 0.88, o: 0.82, f: 0.56, t: 0.54, w: 1.14, a: 0.84, r: 0.58,
-  e: 0.82, E: 0.82, n: 0.82, g: 0.84, i: 0.36,
-};
-
 const LINES = ["Software", "Engineer"];
 
-// Timing
-const STROKE_SPEED = 0.43;  // ms per local-unit of stroke length (1.4× speed)
-const STROKE_GAP = 50;      // ms between strokes in a char
-const CHAR_GAP = 71;        // ms between characters
-const LINE_GAP = 129;       // ms between lines
+// Timing (1.4× speed)
+const STROKE_SPEED = 0.43;
+const STROKE_GAP = 50;
+const CHAR_GAP = 71;
+const LINE_GAP = 129;
 const INITIAL_DELAY = 250;
 
 // ---------------------------------------------------------------------------
@@ -124,173 +118,188 @@ function interp(
 }
 
 // ---------------------------------------------------------------------------
-// Component
+// Component — pure canvas overlay; reads text positions from external textRef
 // ---------------------------------------------------------------------------
-export function SumiTextCanvas() {
+interface SumiTextCanvasProps {
+  textRef: RefObject<HTMLDivElement | null>;
+}
+
+export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const textEl = textRef.current;
+    if (!canvas || !textEl) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-
-    let sim: FluidSimulation;
-    try {
-      sim = new FluidSimulation(canvas, 768);
-    } catch {
-      return;
-    }
+    // parentElement is the shared container (position:relative)
+    const container = canvas.parentElement;
+    if (!container) return;
 
     let running = true;
+    let sim: FluidSimulation | null = null;
 
-    // ---------- layout ----------
-    const cW = rect.width;
-    const cH = rect.height;
+    // Hide text while canvas animates; will reveal during crossfade
+    textEl.style.opacity = "0";
 
-    // Compute width of each line in proportion units
-    const lineUnits = LINES.map((l) => {
-      let w = 0;
-      for (const ch of l) w += WIDTHS[ch] ?? 0.7;
-      return w;
-    });
-    const maxUnits = Math.max(...lineUnits);
+    // Wait for fonts, then one frame for layout, then init
+    document.fonts.ready.then(() => {
+      if (!running) return;
+      requestAnimationFrame(() => {
+        if (!running) return;
 
-    // Character cell height = 1.35 × cell unit width (in pixels)
-    const totalHeightUnits =
-      LINES.length * 1.35 + (LINES.length - 1) * 0.35;
-    const pxPerUnit = Math.min(
-      (cW * 0.78) / maxUnits,
-      (cH * 0.78) / totalHeightUnits,
-    );
+        const containerRect = container.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = containerRect.width * dpr;
+        canvas.height = containerRect.height * dpr;
 
-    // UV conversions
-    const cellH_uv = (1.35 * pxPerUnit) / cH;
-    const gapH_uv = (0.35 * pxPerUnit) / cH;
-    const totalH_uv =
-      LINES.length * cellH_uv + (LINES.length - 1) * gapH_uv;
-    const textTop = 0.5 + totalH_uv / 2;
+        const cW = containerRect.width;
+        const cH = containerRect.height;
 
-    // ---------- build stroke list ----------
-    interface Anim {
-      pts: [number, number][];
-      dur: number;
-      pause: number;
-    }
-    const anims: Anim[] = [];
+        try {
+          sim = new FluidSimulation(canvas, 768);
+        } catch {
+          textEl.style.opacity = "1";
+          return;
+        }
 
-    for (let li = 0; li < LINES.length; li++) {
-      const line = LINES[li];
-      const lineW_uv = (lineUnits[li] * pxPerUnit) / cW;
-      let cx = 0.5 - lineW_uv / 2;
-      const cy = textTop - li * (cellH_uv + gapH_uv);
+        // ---- Measure each character span from DOM ----
+        const spans = textEl.querySelectorAll<HTMLSpanElement>("[data-char]");
 
-      for (let ci = 0; ci < line.length; ci++) {
-        const ch = line[ci];
-        const chW_uv = ((WIDTHS[ch] ?? 0.7) * pxPerUnit) / cW;
-        const medians = STROKES[ch];
+        interface Anim {
+          pts: [number, number][];
+          dur: number;
+          pause: number;
+        }
+        const anims: Anim[] = [];
+        let refCellH = 0;
 
-        if (medians) {
+        spans.forEach((span) => {
+          const ch = span.dataset.char!;
+          const li = parseInt(span.dataset.line!, 10);
+          const ci = parseInt(span.dataset.ci!, 10);
+          const lineLen = parseInt(span.dataset.lineLen!, 10);
+
+          const r = span.getBoundingClientRect();
+
+          // Convert DOM pixel rect → FluidSimulation UV coords (Y-up)
+          const leftUV = (r.left - containerRect.left) / cW;
+          const topUV = 1 - (r.top - containerRect.top) / cH;
+          const wUV = r.width / cW;
+          const hUV = r.height / cH;
+
+          if (refCellH === 0) refCellH = hUV;
+
+          const medians = STROKES[ch];
+          if (!medians) return;
+
           for (let si = 0; si < medians.length; si++) {
             const m = medians[si];
             const len = sLen(m);
-            // Dense interpolation: enough points so adjacent splats overlap
             const steps = Math.max(40, Math.round(len / 2));
-            const pts = interp(m, steps, cx, cy, chW_uv, cellH_uv);
-            // Slower animation: more time per stroke
+            const pts = interp(m, steps, leftUV, topUV, wUV, hUV);
             const dur = Math.max(200, STROKE_SPEED * len);
-            const last = si === medians.length - 1;
-            const lastChar = ci === line.length - 1;
+
+            const lastStroke = si === medians.length - 1;
+            const lastChar = ci === lineLen - 1;
             const lastLine = li === LINES.length - 1;
 
             let pause = STROKE_GAP;
-            if (last && !lastChar) pause = CHAR_GAP;
-            if (last && lastChar && !lastLine) pause = LINE_GAP;
+            if (lastStroke && !lastChar) pause = CHAR_GAP;
+            if (lastStroke && lastChar && !lastLine) pause = LINE_GAP;
 
             anims.push({ pts, dur, pause });
           }
+        });
+
+        if (anims.length === 0 || !sim) {
+          textEl.style.opacity = "1";
+          return;
         }
-        cx += chW_uv;
-      }
-    }
 
-    // ---------- brush parameters ----------
-    // Scale proportionally to character size (ShodoCanvas: 0.8 UV → 0.000288)
-    const sizeRatio = cellH_uv / 0.8;
-    const radiusBase = 0.000288 * sizeRatio;
-    const radiusVar = 0.000144 * sizeRatio;
-    // Scale velocity so brush dynamics feel similar regardless of char size
-    const velMul = 40 / sizeRatio;
+        // ---- Brush parameters ----
+        const sizeRatio = (refCellH || 0.15) / 0.8;
+        const radiusBase = 0.000288 * sizeRatio;
+        const radiusVar = 0.000144 * sizeRatio;
+        const velMul = 40 / sizeRatio;
 
-    // ---------- animation ----------
-    let idx = 0;
-    let ptIdx = -1; // track which point index we last splatted
-    let sStart = performance.now() + INITIAL_DELAY;
-    let lastTime = performance.now();
-    let pausing = false;
-    let pauseEnd = 0;
+        // ---- Animation ----
+        const localSim = sim;
+        let idx = 0;
+        let ptIdx = -1;
+        let sStart = performance.now() + INITIAL_DELAY;
+        let lastTime = performance.now();
+        let pausing = false;
+        let pauseEnd = 0;
 
-    function tick(now: number) {
-      if (!running) return;
-      const dt = Math.min((now - lastTime) / 1000, 0.033);
-      lastTime = now;
+        function tick(now: number) {
+          if (!running) return;
+          const dt = Math.min((now - lastTime) / 1000, 0.033);
+          lastTime = now;
 
-      if (pausing) {
-        if (now >= pauseEnd) {
-          pausing = false;
-          sStart = now;
-        }
-      } else if (idx < anims.length && now >= sStart) {
-        const a = anims[idx];
-        const elapsed = now - sStart;
-        const progress = Math.min(elapsed / a.dur, 1);
+          if (pausing) {
+            if (now >= pauseEnd) {
+              pausing = false;
+              sStart = now;
+            }
+          } else if (idx < anims.length && now >= sStart) {
+            const a = anims[idx];
+            const elapsed = now - sStart;
+            const progress = Math.min(elapsed / a.dur, 1);
 
-        const targetIdx = Math.min(
-          Math.floor(progress * (a.pts.length - 1)),
-          a.pts.length - 1,
-        );
+            const targetIdx = Math.min(
+              Math.floor(progress * (a.pts.length - 1)),
+              a.pts.length - 1,
+            );
 
-        // Splat at EVERY point between last splatted and current target.
-        // This prevents dots when frames skip ahead.
-        for (let i = ptIdx + 1; i <= targetIdx; i++) {
-          const pt = a.pts[i];
-          const pp = i > 0 ? a.pts[i - 1] : null;
-          if (pp) {
-            const rdx = pt[0] - pp[0];
-            const rdy = pt[1] - pp[1];
-            const spd = Math.sqrt(rdx * rdx + rdy * rdy);
-            const ink = Math.max(0.3, 0.8 - spd * 8);
-            const r = radiusBase + radiusVar * (1 - Math.min(spd * 10, 0.8));
-            sim.splat(pt[0], pt[1], rdx * velMul, rdy * velMul, ink, r);
+            for (let i = ptIdx + 1; i <= targetIdx; i++) {
+              const pt = a.pts[i];
+              const pp = i > 0 ? a.pts[i - 1] : null;
+              if (pp) {
+                const rdx = pt[0] - pp[0];
+                const rdy = pt[1] - pp[1];
+                const spd = Math.sqrt(rdx * rdx + rdy * rdy);
+                const ink = Math.max(0.3, 0.8 - spd * 8);
+                const r =
+                  radiusBase + radiusVar * (1 - Math.min(spd * 10, 0.8));
+                localSim.splat(
+                  pt[0],
+                  pt[1],
+                  rdx * velMul,
+                  rdy * velMul,
+                  ink,
+                  r,
+                );
+              }
+            }
+            ptIdx = targetIdx;
+
+            if (progress >= 1) {
+              const pause = anims[idx].pause;
+              idx++;
+              ptIdx = -1;
+              if (pause > 0 && idx < anims.length) {
+                pausing = true;
+                pauseEnd = now + pause;
+              } else {
+                sStart = now;
+              }
+            }
           }
+
+          localSim.step(dt);
+          localSim.render();
+
+          requestAnimationFrame(tick);
         }
-        ptIdx = targetIdx;
 
-        if (progress >= 1) {
-          const pause = anims[idx].pause;
-          idx++;
-          ptIdx = -1;
-          if (pause > 0) {
-            pausing = true;
-            pauseEnd = now + pause;
-          } else {
-            sStart = now;
-          }
-        }
-      }
-
-      sim.step(dt);
-      sim.render();
-      requestAnimationFrame(tick);
-    }
-
-    requestAnimationFrame(tick);
+        requestAnimationFrame(tick);
+      });
+    });
 
     const onResize = () => {
-      const r = canvas.getBoundingClientRect();
+      const r = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
       canvas.width = r.width * dpr;
       canvas.height = r.height * dpr;
     };
@@ -299,14 +308,21 @@ export function SumiTextCanvas() {
     return () => {
       running = false;
       window.removeEventListener("resize", onResize);
-      sim.dispose();
+      textEl.style.opacity = "1";
+      sim?.dispose();
     };
-  }, []);
+  }, [textRef]);
 
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: "100%", height: "100%", display: "block" }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        display: "block",
+      }}
     />
   );
 }
