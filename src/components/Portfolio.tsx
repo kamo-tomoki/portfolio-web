@@ -48,15 +48,14 @@ const styles: Record<string, CSSProperties> = {
     position: "absolute",
     inset: 0,
     gap: isMobile ? "0.25em" : "0.35em",
-    opacity: 0,
-    pointerEvents: "none",
+    zIndex: 1,
   },
   title: {
     fontSize: isMobile ? "clamp(2rem, 10vw, 3.5rem)" : "clamp(3rem, 7vw, 7rem)",
     fontFamily: "'Inter', sans-serif",
     fontWeight: 700,
+    color: "transparent",
     lineHeight: 1.2,
-    color: "#000",
     margin: 0,
   },
 };

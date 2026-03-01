@@ -316,6 +316,7 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
         width: "100%",
         height: "100%",
         display: "block",
+        pointerEvents: "none",
       }}
     />
   );
