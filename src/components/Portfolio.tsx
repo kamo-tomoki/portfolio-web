@@ -50,6 +50,8 @@ const styles: Record<string, CSSProperties> = {
     position: "absolute",
     inset: 0,
     gap: isMobile ? "0.25em" : "0.35em",
+    opacity: 0,
+    pointerEvents: "none",
   },
   titleLine: {
     display: "flex",

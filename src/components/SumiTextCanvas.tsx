@@ -139,9 +139,6 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
     let running = true;
     let sim: FluidSimulation | null = null;
 
-    // Hide text while canvas animates; will reveal during crossfade
-    textEl.style.opacity = "0";
-
     // Wait for fonts, then one frame for layout, then init
     document.fonts.ready.then(() => {
       if (!running) return;
@@ -159,7 +156,6 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
         try {
           sim = new FluidSimulation(canvas, 768);
         } catch {
-          textEl.style.opacity = "1";
           return;
         }
 
@@ -212,10 +208,7 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
           }
         });
 
-        if (anims.length === 0 || !sim) {
-          textEl.style.opacity = "1";
-          return;
-        }
+        if (anims.length === 0 || !sim) return;
 
         // ---- Brush parameters ----
         const sizeRatio = (refCellH || 0.15) / 0.8;
@@ -308,7 +301,6 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
     return () => {
       running = false;
       window.removeEventListener("resize", onResize);
-      textEl.style.opacity = "1";
       sim?.dispose();
     };
   }, [textRef]);
