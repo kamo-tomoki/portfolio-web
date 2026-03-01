@@ -108,7 +108,7 @@ export default function HandwritingApp() {
           className="page-content"
           style={{
             ...appStyles.pageContent,
-            visibility: isComplete ? "visible" : "hidden",
+            visibility: currentPage !== "home" || isComplete ? "visible" : "hidden",
             opacity: effectiveOpacity,
           }}
         >
@@ -121,14 +121,16 @@ export default function HandwritingApp() {
           )}
         </div>
       </div>
-      <canvas
-        ref={canvasRef}
-        style={{
-          ...appStyles.liquidCanvas,
-          pointerEvents: isComplete ? "none" : "auto",
-          display: isComplete ? "none" : "block",
-        }}
-      />
+      {currentPage === "home" && (
+        <canvas
+          ref={canvasRef}
+          style={{
+            ...appStyles.liquidCanvas,
+            pointerEvents: isComplete ? "none" : "auto",
+            display: isComplete ? "none" : "block",
+          }}
+        />
+      )}
       <InkTransitionOverlay ref={overlayRef} />
       <InkCursor />
     </div>

@@ -57,8 +57,6 @@ const STROKES: Record<string, number[][][]> = {
   ],
 };
 
-const LINES = ["Software", "Engineer"];
-
 // Timing (1.4× speed)
 const STROKE_SPEED = 0.43;
 const STROKE_GAP = 50;
@@ -159,8 +157,8 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
           return;
         }
 
-        // ---- Measure each character span from DOM ----
-        const spans = textEl.querySelectorAll<HTMLSpanElement>("[data-char]");
+        // ---- Measure each character via Range API ----
+        const headings = textEl.querySelectorAll("h1");
 
         interface Anim {
           pts: [number, number][];
@@ -170,41 +168,45 @@ export function SumiTextCanvas({ textRef }: SumiTextCanvasProps) {
         const anims: Anim[] = [];
         let refCellH = 0;
 
-        spans.forEach((span) => {
-          const ch = span.dataset.char!;
-          const li = parseInt(span.dataset.line!, 10);
-          const ci = parseInt(span.dataset.ci!, 10);
-          const lineLen = parseInt(span.dataset.lineLen!, 10);
+        headings.forEach((h1, li) => {
+          const text = h1.textContent || "";
+          const textNode = h1.firstChild;
+          if (!textNode) return;
 
-          const r = span.getBoundingClientRect();
+          for (let ci = 0; ci < text.length; ci++) {
+            const ch = text[ci];
+            const range = document.createRange();
+            range.setStart(textNode, ci);
+            range.setEnd(textNode, ci + 1);
+            const r = range.getBoundingClientRect();
 
-          // Convert DOM pixel rect → FluidSimulation UV coords (Y-up)
-          const leftUV = (r.left - containerRect.left) / cW;
-          const topUV = 1 - (r.top - containerRect.top) / cH;
-          const wUV = r.width / cW;
-          const hUV = r.height / cH;
+            const leftUV = (r.left - containerRect.left) / cW;
+            const topUV = 1 - (r.top - containerRect.top) / cH;
+            const wUV = r.width / cW;
+            const hUV = r.height / cH;
 
-          if (refCellH === 0) refCellH = hUV;
+            if (refCellH === 0) refCellH = hUV;
 
-          const medians = STROKES[ch];
-          if (!medians) return;
+            const medians = STROKES[ch];
+            if (!medians) continue;
 
-          for (let si = 0; si < medians.length; si++) {
-            const m = medians[si];
-            const len = sLen(m);
-            const steps = Math.max(40, Math.round(len / 2));
-            const pts = interp(m, steps, leftUV, topUV, wUV, hUV);
-            const dur = Math.max(200, STROKE_SPEED * len);
+            for (let si = 0; si < medians.length; si++) {
+              const m = medians[si];
+              const len = sLen(m);
+              const steps = Math.max(40, Math.round(len / 2));
+              const pts = interp(m, steps, leftUV, topUV, wUV, hUV);
+              const dur = Math.max(200, STROKE_SPEED * len);
 
-            const lastStroke = si === medians.length - 1;
-            const lastChar = ci === lineLen - 1;
-            const lastLine = li === LINES.length - 1;
+              const lastStroke = si === medians.length - 1;
+              const lastChar = ci === text.length - 1;
+              const lastLine = li === headings.length - 1;
 
-            let pause = STROKE_GAP;
-            if (lastStroke && !lastChar) pause = CHAR_GAP;
-            if (lastStroke && lastChar && !lastLine) pause = LINE_GAP;
+              let pause = STROKE_GAP;
+              if (lastStroke && !lastChar) pause = CHAR_GAP;
+              if (lastStroke && lastChar && !lastLine) pause = LINE_GAP;
 
-            anims.push({ pts, dur, pause });
+              anims.push({ pts, dur, pause });
+            }
           }
         });
 

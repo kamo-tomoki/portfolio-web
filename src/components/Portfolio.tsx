@@ -7,8 +7,6 @@ interface PortfolioProps {
 
 const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
-const LINES = ["Software", "Engineer"];
-
 const styles: Record<string, CSSProperties> = {
   container: {
     minHeight: "100vh",
@@ -53,15 +51,13 @@ const styles: Record<string, CSSProperties> = {
     opacity: 0,
     pointerEvents: "none",
   },
-  titleLine: {
-    display: "flex",
-  },
-  titleChar: {
+  title: {
     fontSize: isMobile ? "clamp(2rem, 10vw, 3.5rem)" : "clamp(3rem, 7vw, 7rem)",
     fontFamily: "'Inter', sans-serif",
     fontWeight: 700,
     lineHeight: 1.2,
     color: "#000",
+    margin: 0,
   },
 };
 
@@ -83,26 +79,10 @@ export function Portfolio({ onNavigateHome }: PortfolioProps) {
         </a>
       </header>
       <div style={styles.content}>
-        {/* HTML text — SumiTextCanvas reads positions from these spans */}
         <div ref={textRef} style={styles.titleArea}>
-          {LINES.map((line, li) => (
-            <div key={li} style={styles.titleLine}>
-              {line.split("").map((ch, ci) => (
-                <span
-                  key={ci}
-                  data-char={ch}
-                  data-line={li}
-                  data-ci={ci}
-                  data-line-len={line.length}
-                  style={styles.titleChar}
-                >
-                  {ch}
-                </span>
-              ))}
-            </div>
-          ))}
+          <h1 style={styles.title}>Software</h1>
+          <h1 style={styles.title}>Engineer</h1>
         </div>
-        {/* Canvas overlay — draws sumi ink synced to text positions */}
         <SumiTextCanvas textRef={textRef} />
       </div>
     </div>
